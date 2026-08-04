@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Localizar borrador y descargar APK
+      - name: Localizar borrador correcto y descargar APK
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -33,17 +33,18 @@ jobs:
           import json,os
           releases=json.load(open('private/releases.json'))
           if isinstance(releases,dict): releases=releases.get('items') or releases.get('releases') or []
-          matches=[r for r in releases if r.get('tag_name')==os.environ['TAG_NAME']]
-          assert len(matches)==1,matches
-          r=matches[0]
-          assert r.get('draft') is True,r
-          assets=[a for a in r.get('assets',[]) if a.get('name')==os.environ['ASSET_NAME']]
-          assert len(assets)==1,assets
-          a=assets[0]
-          assert int(a.get('size') or 0)>70_000_000,a
+          matches=[r for r in releases if r.get('tag_name')==os.environ['TAG_NAME'] and r.get('draft') is True]
+          candidates=[]
+          for r in matches:
+            assets=[a for a in r.get('assets',[]) if a.get('name')==os.environ['ASSET_NAME'] and a.get('state')=='uploaded' and int(a.get('size') or 0)>70_000_000]
+            if len(assets)==1: candidates.append((r,assets[0]))
+          assert len(candidates)==1,{'matches':matches,'candidates':candidates}
+          r,a=candidates[0]
+          duplicates=[m['id'] for m in matches if m.get('id')!=r.get('id') and not m.get('assets')]
           open('private/release_id.txt','w').write(str(r['id']))
           open('private/asset_id.txt','w').write(str(a['id']))
-          json.dump({'release_id':r['id'],'tag':r['tag_name'],'draft':r['draft'],'asset_id':a['id'],'asset_name':a['name'],'asset_size':a['size']},open('report/draft-release.json','w'),indent=2)
+          json.dump(duplicates,open('private/duplicate_release_ids.json','w'))
+          json.dump({'release_id':r['id'],'tag':r['tag_name'],'draft':r['draft'],'asset_id':a['id'],'asset_name':a['name'],'asset_size':a['size'],'asset_digest':a.get('digest'),'empty_duplicates':duplicates},open('report/draft-release.json','w'),indent=2)
           PY
           gh api -H 'Accept: application/octet-stream' "repos/${GITHUB_REPOSITORY}/releases/assets/$(cat private/asset_id.txt)" > "private/${ASSET_NAME}"
           test "$(stat -c%s "private/${ASSET_NAME}")" -gt 70000000
@@ -72,13 +73,16 @@ jobs:
           set -Eeuo pipefail
           RID="$(cat private/release_id.txt)"
           gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${RID}" \
-            -F draft=false -F prerelease=false -F make_latest=true > private/published.json
+            -F draft=false -F prerelease=false -F make_latest=true \
+            -f name='Fénix 360 V6.4.11 — Versión definitiva' > private/published.json
           python3 - <<'PY'
           import json,os
           d=json.load(open('private/published.json'))
           assert d.get('draft') is False,d
           assert d.get('tag_name')==os.environ['TAG_NAME'],d
-          json.dump({'id':d.get('id'),'tag':d.get('tag_name'),'name':d.get('name'),'draft':d.get('draft'),'prerelease':d.get('prerelease'),'html_url':d.get('html_url')},open('report/published-release.json','w'),indent=2)
+          assets=[a for a in d.get('assets',[]) if a.get('name')==os.environ['ASSET_NAME']]
+          assert len(assets)==1,assets
+          json.dump({'id':d.get('id'),'tag':d.get('tag_name'),'name':d.get('name'),'draft':d.get('draft'),'prerelease':d.get('prerelease'),'html_url':d.get('html_url'),'asset':{'name':assets[0].get('name'),'size':assets[0].get('size'),'digest':assets[0].get('digest')}},open('report/published-release.json','w'),indent=2)
           PY
 
       - name: Verificar descarga pública y Worker de Downloader
@@ -100,6 +104,20 @@ jobs:
             test "$ok" = 1
           done
           echo VERIFIED_RELEASE_AND_DOWNLOADER > report/result.txt
+
+      - name: Eliminar solamente borradores duplicados vacíos
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY' > private/duplicates.txt
+          import json
+          for x in json.load(open('private/duplicate_release_ids.json')): print(x)
+          PY
+          while read -r RID; do
+            [ -z "$RID" ] && continue
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${RID}"
+            echo "$RID" >> report/deleted-empty-drafts.txt
+          done < private/duplicates.txt
 
       - name: Volver a borrador si falla después de publicar
         if: failure() && steps.publish.outcome == 'success'
