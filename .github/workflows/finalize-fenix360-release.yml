@@ -73,14 +73,10 @@ jobs:
         run: |
           set -Eeuo pipefail
           if gh api "repos/${GITHUB_REPOSITORY}/releases/${EMPTY_DUPLICATE_ID}" > private/empty.json 2>/dev/null; then
-            python3 - <<'PY'
-            import json,os
-            d=json.load(open('private/empty.json'))
-            assert str(d.get('id'))==os.environ['EMPTY_DUPLICATE_ID'],d
-            assert d.get('draft') is True,d
-            assert d.get('tag_name')==os.environ['TAG_NAME'],d
-            assert not d.get('assets'),d
-            PY
+            test "$(jq -r '.id' private/empty.json)" = "$EMPTY_DUPLICATE_ID"
+            test "$(jq -r '.draft' private/empty.json)" = "true"
+            test "$(jq -r '.tag_name' private/empty.json)" = "$TAG_NAME"
+            test "$(jq -r '.assets | length' private/empty.json)" = "0"
             gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${EMPTY_DUPLICATE_ID}"
             echo "$EMPTY_DUPLICATE_ID" > report/deleted-empty-draft.txt
           else
