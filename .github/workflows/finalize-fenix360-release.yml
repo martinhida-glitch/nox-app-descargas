@@ -37,12 +37,15 @@ jobs:
           r=json.load(open('report/release-before.json'))
           a=json.load(open('report/asset-metadata.json'))
           assert str(r.get('id'))==os.environ['TARGET_RELEASE_ID'],r
-          assert r.get('tag_name')==os.environ['TAG_NAME'],r
+          assert r.get('draft') is True,r
+          assert r.get('name')=='Fénix 360 V6.4.11 — Versión definitiva',r
           assert str(a.get('id'))==os.environ['TARGET_ASSET_ID'],a
           assert a.get('name')==os.environ['ASSET_NAME'],a
           assert a.get('state')=='uploaded',a
           assert int(a.get('size') or 0)>70_000_000,a
           assert a.get('digest')=='sha256:'+os.environ['EXPECTED_SHA256'],a
+          release_asset_ids={str(x.get('id')) for x in r.get('assets',[])}
+          assert os.environ['TARGET_ASSET_ID'] in release_asset_ids,(release_asset_ids,r)
           PY
           gh api -H 'Accept: application/octet-stream' "repos/${GITHUB_REPOSITORY}/releases/assets/${TARGET_ASSET_ID}" > "private/${ASSET_NAME}"
           test "$(stat -c%s "private/${ASSET_NAME}")" -gt 70000000
