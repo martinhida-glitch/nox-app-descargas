@@ -1,0 +1,48 @@
+name: Auditar descarga actual Fénix
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/audit-current-fenix-download.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: github.head_ref == 'agent/publish-fenix360-6411-20260803'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Descargar y auditar ruta actual
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p report private
+          URL='https://nox-descargas.pagos-noxplay.workers.dev/fenix'
+          curl -fsSIL --max-redirs 10 "$URL" > report/redirect-chain.txt
+          curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors "$URL" -o private/current.apk
+          stat -c '%s' private/current.apk > report/current-size.txt
+          sha256sum private/current.apk > report/current-sha256.txt
+          file private/current.apk > report/file-type.txt
+          unzip -t private/current.apk > report/zip-test.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,re,subprocess
+          headers=Path('report/redirect-chain.txt').read_text(errors='replace')
+          locations=re.findall(r'(?im)^location:\s*(.+)$',headers)
+          Path('report/redirects.json').write_text(json.dumps({'locations':locations},ensure_ascii=False,indent=2))
+          PY
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/aapt" dump badging private/current.apk > report/aapt-badging.txt
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs private/current.apk > report/apksigner.txt
+          grep -m1 "package: name='com.nox4k.xuperfenix.v6'" report/aapt-badging.txt
+          echo VERIFIED_CURRENT_DOWNLOAD > report/result.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: current-fenix-download-audit
+          path: report/
+          retention-days: 3
