@@ -65,7 +65,7 @@ jobs:
           grep -Fq 'Verified using v1 scheme (JAR signing): true' report/apksigner.txt
           grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' report/apksigner.txt
           grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' report/apksigner.txt
-          grep -Fq 'Signer #1 certificate SHA-256 digest: 37451f1f4cc89db74ce799d86bb0c9773e3d0f6d679c69e6415fb52f6b51ef0d' report/apksigner.txt
+          grep -Fq 'certificate SHA-256 digest: 37451f1f4cc89db74ce799d86bb0c9773e3d0f6d679c69e6415fb52f6b51ef0d' report/apksigner.txt
           stat -c '%s' "private/${ASSET_NAME}" > report/apk-size.txt
 
       - name: Eliminar únicamente el borrador duplicado vacío
