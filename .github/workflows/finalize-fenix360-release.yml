@@ -19,33 +19,32 @@ jobs:
       EXPECTED_SHA256: db101e73a69364c6d87cd96b76a933b8ecd13cae2aac040b2484cc6c72458efa
       ASSET_NAME: xuper-fenix-v6.apk
       TAG_NAME: v6.4.11
+      TARGET_RELEASE_ID: '364573896'
+      TARGET_ASSET_ID: '500778535'
+      EMPTY_DUPLICATE_ID: '364576503'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Localizar borrador correcto y descargar APK
+      - name: Recuperar el borrador exacto y su APK
         shell: bash
         run: |
           set -Eeuo pipefail
           mkdir -p private report
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > private/releases.json
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${TARGET_RELEASE_ID}" > report/release-before.json
+          gh api "repos/${GITHUB_REPOSITORY}/releases/assets/${TARGET_ASSET_ID}" > report/asset-metadata.json
           python3 - <<'PY'
           import json,os
-          releases=json.load(open('private/releases.json'))
-          if isinstance(releases,dict): releases=releases.get('items') or releases.get('releases') or []
-          matches=[r for r in releases if r.get('tag_name')==os.environ['TAG_NAME'] and r.get('draft') is True]
-          candidates=[]
-          for r in matches:
-            assets=[a for a in r.get('assets',[]) if a.get('name')==os.environ['ASSET_NAME'] and a.get('state')=='uploaded' and int(a.get('size') or 0)>70_000_000]
-            if len(assets)==1: candidates.append((r,assets[0]))
-          assert len(candidates)==1,{'matches':matches,'candidates':candidates}
-          r,a=candidates[0]
-          duplicates=[m['id'] for m in matches if m.get('id')!=r.get('id') and not m.get('assets')]
-          open('private/release_id.txt','w').write(str(r['id']))
-          open('private/asset_id.txt','w').write(str(a['id']))
-          json.dump(duplicates,open('private/duplicate_release_ids.json','w'))
-          json.dump({'release_id':r['id'],'tag':r['tag_name'],'draft':r['draft'],'asset_id':a['id'],'asset_name':a['name'],'asset_size':a['size'],'asset_digest':a.get('digest'),'empty_duplicates':duplicates},open('report/draft-release.json','w'),indent=2)
+          r=json.load(open('report/release-before.json'))
+          a=json.load(open('report/asset-metadata.json'))
+          assert str(r.get('id'))==os.environ['TARGET_RELEASE_ID'],r
+          assert r.get('tag_name')==os.environ['TAG_NAME'],r
+          assert str(a.get('id'))==os.environ['TARGET_ASSET_ID'],a
+          assert a.get('name')==os.environ['ASSET_NAME'],a
+          assert a.get('state')=='uploaded',a
+          assert int(a.get('size') or 0)>70_000_000,a
+          assert a.get('digest')=='sha256:'+os.environ['EXPECTED_SHA256'],a
           PY
-          gh api -H 'Accept: application/octet-stream' "repos/${GITHUB_REPOSITORY}/releases/assets/$(cat private/asset_id.txt)" > "private/${ASSET_NAME}"
+          gh api -H 'Accept: application/octet-stream' "repos/${GITHUB_REPOSITORY}/releases/assets/${TARGET_ASSET_ID}" > "private/${ASSET_NAME}"
           test "$(stat -c%s "private/${ASSET_NAME}")" -gt 70000000
 
       - name: Verificar hash versión paquete y firmas
@@ -63,36 +62,65 @@ jobs:
           grep -Fq 'Verified using v1 scheme (JAR signing): true' report/apksigner.txt
           grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' report/apksigner.txt
           grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' report/apksigner.txt
+          grep -Fq 'Signer #1 certificate SHA-256 digest: 37451f1f4cc89db74ce799d86bb0c9773e3d0f6d679c69e6415fb52f6b51ef0d' report/apksigner.txt
           stat -c '%s' "private/${ASSET_NAME}" > report/apk-size.txt
 
-      - name: Publicar Release como última versión
-        id: publish
+      - name: Eliminar únicamente el borrador duplicado vacío
         shell: bash
         run: |
           set -Eeuo pipefail
-          RID="$(cat private/release_id.txt)"
-          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${RID}" \
-            -F draft=false -F prerelease=false -F make_latest=true \
-            -f name='Fénix 360 V6.4.11 — Versión definitiva' > private/published.json
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/${EMPTY_DUPLICATE_ID}" > private/empty.json 2>/dev/null; then
+            python3 - <<'PY'
+            import json,os
+            d=json.load(open('private/empty.json'))
+            assert str(d.get('id'))==os.environ['EMPTY_DUPLICATE_ID'],d
+            assert d.get('draft') is True,d
+            assert d.get('tag_name')==os.environ['TAG_NAME'],d
+            assert not d.get('assets'),d
+            PY
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${EMPTY_DUPLICATE_ID}"
+            echo "$EMPTY_DUPLICATE_ID" > report/deleted-empty-draft.txt
+          else
+            echo ALREADY_ABSENT > report/deleted-empty-draft.txt
+          fi
+
+      - name: Publicar Release definitiva
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cat > private/payload.json <<'JSON'
+          {
+            "tag_name": "v6.4.11",
+            "target_commitish": "main",
+            "name": "Fénix 360 V6.4.11 — Versión definitiva",
+            "body": "Versión definitiva de Fénix 360. Demo de 7 días, suscripción, VPN interna, actualización obligatoria y control de acceso. Archivo: xuper-fenix-v6.apk. SHA-256: db101e73a69364c6d87cd96b76a933b8ecd13cae2aac040b2484cc6c72458efa.",
+            "draft": false,
+            "prerelease": false,
+            "make_latest": "true"
+          }
+          JSON
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${TARGET_RELEASE_ID}" --input private/payload.json > report/published-release.json
           python3 - <<'PY'
           import json,os
-          d=json.load(open('private/published.json'))
+          d=json.load(open('report/published-release.json'))
+          assert str(d.get('id'))==os.environ['TARGET_RELEASE_ID'],d
           assert d.get('draft') is False,d
+          assert d.get('prerelease') is False,d
           assert d.get('tag_name')==os.environ['TAG_NAME'],d
           assets=[a for a in d.get('assets',[]) if a.get('name')==os.environ['ASSET_NAME']]
           assert len(assets)==1,assets
           a=assets[0]
-          open('private/public_asset_url.txt','w').write(a['browser_download_url'])
-          json.dump({'id':d.get('id'),'tag':d.get('tag_name'),'name':d.get('name'),'draft':d.get('draft'),'prerelease':d.get('prerelease'),'html_url':d.get('html_url'),'asset':{'name':a.get('name'),'size':a.get('size'),'digest':a.get('digest'),'browser_download_url':a.get('browser_download_url')}},open('report/published-release.json','w'),indent=2)
+          assert a.get('digest')=='sha256:'+os.environ['EXPECTED_SHA256'],a
+          open('private/public-url.txt','w').write(a['browser_download_url'])
           PY
 
-      - name: Verificar URL pública directa del tag
+      - name: Verificar descarga pública exacta
         shell: bash
         run: |
           set -Eeuo pipefail
-          URL="$(cat private/public_asset_url.txt)"
+          URL="$(cat private/public-url.txt)"
           ok=0
-          for n in 1 2 3 4 5 6 7 8; do
+          for n in 1 2 3 4 5 6 7 8 9 10; do
             if curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -H 'Cache-Control: no-cache' "$URL" -o private/public.apk; then
               sha="$(sha256sum private/public.apk | awk '{print $1}')"
               if [ "$sha" = "$EXPECTED_SHA256" ]; then
@@ -101,33 +129,11 @@ jobs:
                 break
               fi
             fi
-            sleep 10
+            sleep 12
           done
           test "$ok" = 1
-          echo VERIFIED_RELEASE_DIRECT_URL > report/result.txt
-
-      - name: Eliminar solamente borradores duplicados vacíos
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 - <<'PY' > private/duplicates.txt
-          import json
-          for x in json.load(open('private/duplicate_release_ids.json')): print(x)
-          PY
-          while read -r RID; do
-            [ -z "$RID" ] && continue
-            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${RID}"
-            echo "$RID" >> report/deleted-empty-drafts.txt
-          done < private/duplicates.txt
-
-      - name: Volver a borrador si falla después de publicar
-        if: failure() && steps.publish.outcome == 'success'
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          RID="$(cat private/release_id.txt)"
-          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${RID}" -F draft=true > private/rollback-release.json
-          echo RELEASE_ROLLED_BACK_TO_DRAFT > report/rollback.txt
+          cmp "private/${ASSET_NAME}" private/public.apk
+          echo VERIFIED_RELEASE_PUBLIC > report/result.txt
 
       - name: Subir evidencia
         if: always()
@@ -136,4 +142,4 @@ jobs:
           name: fenix360-v6411-release-finalization
           path: report/
           if-no-files-found: warn
-          retention-days: 5
+          retention-days: 7
