@@ -30,7 +30,7 @@ jobs:
           unzip -t private/current.apk > report/zip-test.txt
           python3 - <<'PY'
           from pathlib import Path
-          import json,re,subprocess
+          import json,re
           headers=Path('report/redirect-chain.txt').read_text(errors='replace')
           locations=re.findall(r'(?im)^location:\s*(.+)$',headers)
           Path('report/redirects.json').write_text(json.dumps({'locations':locations},ensure_ascii=False,indent=2))
@@ -45,4 +45,11 @@ jobs:
         with:
           name: current-fenix-download-audit
           path: report/
+          retention-days: 3
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: current-fenix-apk-backup-v1.0.0
+          path: private/current.apk
+          compression-level: 0
           retention-days: 3
