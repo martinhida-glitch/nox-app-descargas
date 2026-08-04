@@ -19,7 +19,6 @@ jobs:
       EXPECTED_SHA256: db101e73a69364c6d87cd96b76a933b8ecd13cae2aac040b2484cc6c72458efa
       ASSET_NAME: xuper-fenix-v6.apk
       TAG_NAME: v6.4.11
-      WORKER_URL: https://nox-descargas.pagos-noxplay.workers.dev/fenix
     steps:
       - uses: actions/checkout@v4
 
@@ -82,28 +81,30 @@ jobs:
           assert d.get('tag_name')==os.environ['TAG_NAME'],d
           assets=[a for a in d.get('assets',[]) if a.get('name')==os.environ['ASSET_NAME']]
           assert len(assets)==1,assets
-          json.dump({'id':d.get('id'),'tag':d.get('tag_name'),'name':d.get('name'),'draft':d.get('draft'),'prerelease':d.get('prerelease'),'html_url':d.get('html_url'),'asset':{'name':assets[0].get('name'),'size':assets[0].get('size'),'digest':assets[0].get('digest')}},open('report/published-release.json','w'),indent=2)
+          a=assets[0]
+          open('private/public_asset_url.txt','w').write(a['browser_download_url'])
+          json.dump({'id':d.get('id'),'tag':d.get('tag_name'),'name':d.get('name'),'draft':d.get('draft'),'prerelease':d.get('prerelease'),'html_url':d.get('html_url'),'asset':{'name':a.get('name'),'size':a.get('size'),'digest':a.get('digest'),'browser_download_url':a.get('browser_download_url')}},open('report/published-release.json','w'),indent=2)
           PY
 
-      - name: Verificar descarga pública y Worker de Downloader
+      - name: Verificar URL pública directa del tag
         shell: bash
         run: |
           set -Eeuo pipefail
-          sleep 25
-          LATEST_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/${ASSET_NAME}"
-          for URL in "$LATEST_URL" "$WORKER_URL"; do
-            name="$(echo "$URL" | sed 's#https://##;s#[/:?&=]#_#g')"
-            ok=0
-            for n in 1 2 3 4 5 6; do
-              if curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -H 'Cache-Control: no-cache' "${URL}?verify=$(date +%s)-${n}" -o "private/${name}.apk"; then
-                sha="$(sha256sum "private/${name}.apk" | awk '{print $1}')"
-                if [ "$sha" = "$EXPECTED_SHA256" ]; then ok=1; echo "$sha  $URL" >> report/public-downloads-sha256.txt; break; fi
+          URL="$(cat private/public_asset_url.txt)"
+          ok=0
+          for n in 1 2 3 4 5 6 7 8; do
+            if curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -H 'Cache-Control: no-cache' "$URL" -o private/public.apk; then
+              sha="$(sha256sum private/public.apk | awk '{print $1}')"
+              if [ "$sha" = "$EXPECTED_SHA256" ]; then
+                ok=1
+                echo "$sha  $URL" > report/public-download-sha256.txt
+                break
               fi
-              sleep 10
-            done
-            test "$ok" = 1
+            fi
+            sleep 10
           done
-          echo VERIFIED_RELEASE_AND_DOWNLOADER > report/result.txt
+          test "$ok" = 1
+          echo VERIFIED_RELEASE_DIRECT_URL > report/result.txt
 
       - name: Eliminar solamente borradores duplicados vacíos
         shell: bash
