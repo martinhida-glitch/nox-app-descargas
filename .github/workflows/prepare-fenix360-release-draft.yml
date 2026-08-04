@@ -1,0 +1,79 @@
+name: Preparar Release borrador Fénix 360
+
+on:
+  push:
+    branches:
+      - agent/publish-fenix360-6411-20260803
+    paths:
+      - '.github/workflows/prepare-fenix360-release-draft.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Renombrar respaldo y crear borrador nuevo
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p report
+          api="https://api.github.com/repos/${REPO}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28')
+
+          old="$(curl -fsS "${auth[@]}" "${api}/releases/tags/v1.0.0")"
+          old_id="$(jq -r '.id' <<<"$old")"
+          old_asset="$(jq -r '.assets[0].name // empty' <<<"$old")"
+          curl -fsS -X PATCH "${auth[@]}" "${api}/releases/${old_id}" \
+            -d @- > report/old-release.json <<JSON
+          {
+            "name": "RESPALDO — Xuper Fénix V6.4.5 gratuita con publicidad",
+            "body": "Versión anterior conservada únicamente como respaldo técnico. No es la versión vigente. La versión actual es Fénix 360 V6.4.11.",
+            "draft": false,
+            "prerelease": true
+          }
+          JSON
+
+          code="$(curl -sS -o report/new-existing.json -w '%{http_code}' "${auth[@]}" "${api}/releases/tags/v6.4.11")"
+          if [ "$code" = 200 ]; then
+            new_id="$(jq -r '.id' report/new-existing.json)"
+            curl -fsS -X PATCH "${auth[@]}" "${api}/releases/${new_id}" \
+              -d @- > report/new-release.json <<'JSON'
+          {
+            "name": "Fénix 360 V6.4.11 — Versión definitiva",
+            "body": "Versión definitiva con demo de 7 días, suscripción, pagos, Worker V2 y control de actualizaciones.\n\nArchivo obligatorio: xuper-fenix-v6.apk\nSHA-256 esperado: db101e73a69364c6d87cd96b76a933b8ecd13cae2aac040b2484cc6c72458efa",
+            "draft": true,
+            "prerelease": false
+          }
+          JSON
+          elif [ "$code" = 404 ]; then
+            curl -fsS -X POST "${auth[@]}" "${api}/releases" \
+              -d @- > report/new-release.json <<'JSON'
+          {
+            "tag_name": "v6.4.11",
+            "target_commitish": "main",
+            "name": "Fénix 360 V6.4.11 — Versión definitiva",
+            "body": "Versión definitiva con demo de 7 días, suscripción, pagos, Worker V2 y control de actualizaciones.\n\nArchivo obligatorio: xuper-fenix-v6.apk\nSHA-256 esperado: db101e73a69364c6d87cd96b76a933b8ecd13cae2aac040b2484cc6c72458efa",
+            "draft": true,
+            "prerelease": false
+          }
+          JSON
+          else
+            cat report/new-existing.json
+            exit 1
+          fi
+
+          jq '{oldRelease:{id,name,tag_name,prerelease,html_url},oldAsset:"'"$old_asset"'"}' report/old-release.json > report/summary-old.json
+          jq '{newRelease:{id,name,tag_name,draft,prerelease,html_url,upload_url}}' report/new-release.json > report/summary-new.json
+          cat report/summary-old.json report/summary-new.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fenix360-release-draft-prepared
+          path: report/
+          retention-days: 3
