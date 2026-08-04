@@ -1,0 +1,120 @@
+name: Finalizar Release Fénix 360 V6.4.11
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/finalize-fenix360-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-publish:
+    if: github.head_ref == 'agent/publish-fenix360-6411-20260803'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_SHA256: db101e73a69364c6d87cd96b76a933b8ecd13cae2aac040b2484cc6c72458efa
+      ASSET_NAME: xuper-fenix-v6.apk
+      TAG_NAME: v6.4.11
+      WORKER_URL: https://nox-descargas.pagos-noxplay.workers.dev/fenix
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Localizar borrador y descargar APK
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p private report
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > private/releases.json
+          python3 - <<'PY'
+          import json,os
+          releases=json.load(open('private/releases.json'))
+          if isinstance(releases,dict): releases=releases.get('items') or releases.get('releases') or []
+          matches=[r for r in releases if r.get('tag_name')==os.environ['TAG_NAME']]
+          assert len(matches)==1,matches
+          r=matches[0]
+          assert r.get('draft') is True,r
+          assets=[a for a in r.get('assets',[]) if a.get('name')==os.environ['ASSET_NAME']]
+          assert len(assets)==1,assets
+          a=assets[0]
+          assert int(a.get('size') or 0)>70_000_000,a
+          open('private/release_id.txt','w').write(str(r['id']))
+          open('private/asset_id.txt','w').write(str(a['id']))
+          json.dump({'release_id':r['id'],'tag':r['tag_name'],'draft':r['draft'],'asset_id':a['id'],'asset_name':a['name'],'asset_size':a['size']},open('report/draft-release.json','w'),indent=2)
+          PY
+          gh api -H 'Accept: application/octet-stream' "repos/${GITHUB_REPOSITORY}/releases/assets/$(cat private/asset_id.txt)" > "private/${ASSET_NAME}"
+          test "$(stat -c%s "private/${ASSET_NAME}")" -gt 70000000
+
+      - name: Verificar hash versión paquete y firmas
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ACTUAL_SHA="$(sha256sum "private/${ASSET_NAME}" | awk '{print $1}')"
+          echo "$ACTUAL_SHA  ${ASSET_NAME}" > report/apk-sha256.txt
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA256"
+          unzip -t "private/${ASSET_NAME}" > report/zip-test.txt
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/aapt" dump badging "private/${ASSET_NAME}" > report/aapt-badging.txt
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "private/${ASSET_NAME}" > report/apksigner.txt
+          grep -Fq "package: name='com.nox4k.xuperfenix.v6' versionCode='60411' versionName='6.4.11'" report/aapt-badging.txt
+          grep -Fq 'Verified using v1 scheme (JAR signing): true' report/apksigner.txt
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' report/apksigner.txt
+          grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' report/apksigner.txt
+          stat -c '%s' "private/${ASSET_NAME}" > report/apk-size.txt
+
+      - name: Publicar Release como última versión
+        id: publish
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          RID="$(cat private/release_id.txt)"
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${RID}" \
+            -F draft=false -F prerelease=false -F make_latest=true > private/published.json
+          python3 - <<'PY'
+          import json,os
+          d=json.load(open('private/published.json'))
+          assert d.get('draft') is False,d
+          assert d.get('tag_name')==os.environ['TAG_NAME'],d
+          json.dump({'id':d.get('id'),'tag':d.get('tag_name'),'name':d.get('name'),'draft':d.get('draft'),'prerelease':d.get('prerelease'),'html_url':d.get('html_url')},open('report/published-release.json','w'),indent=2)
+          PY
+
+      - name: Verificar descarga pública y Worker de Downloader
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sleep 25
+          LATEST_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/${ASSET_NAME}"
+          for URL in "$LATEST_URL" "$WORKER_URL"; do
+            name="$(echo "$URL" | sed 's#https://##;s#[/:?&=]#_#g')"
+            ok=0
+            for n in 1 2 3 4 5 6; do
+              if curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -H 'Cache-Control: no-cache' "${URL}?verify=$(date +%s)-${n}" -o "private/${name}.apk"; then
+                sha="$(sha256sum "private/${name}.apk" | awk '{print $1}')"
+                if [ "$sha" = "$EXPECTED_SHA256" ]; then ok=1; echo "$sha  $URL" >> report/public-downloads-sha256.txt; break; fi
+              fi
+              sleep 10
+            done
+            test "$ok" = 1
+          done
+          echo VERIFIED_RELEASE_AND_DOWNLOADER > report/result.txt
+
+      - name: Volver a borrador si falla después de publicar
+        if: failure() && steps.publish.outcome == 'success'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          RID="$(cat private/release_id.txt)"
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${RID}" -F draft=true > private/rollback-release.json
+          echo RELEASE_ROLLED_BACK_TO_DRAFT > report/rollback.txt
+
+      - name: Subir evidencia
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fenix360-v6411-release-finalization
+          path: report/
+          if-no-files-found: warn
+          retention-days: 5
