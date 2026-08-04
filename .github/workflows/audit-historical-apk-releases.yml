@@ -1,0 +1,59 @@
+name: Auditar Releases APK históricas
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/audit-historical-apk-releases.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: github.head_ref == 'agent/publish-fenix360-6411-20260803'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Buscar y verificar APK históricas
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p report private
+          repos=(
+            martinhida-glitch/nox-app-descargas
+            martinhida-glitch/xuper-fenix-descargas
+            martinhida-glitch/assets
+            martinhida-glitch/xuper-fenix-web
+          )
+          : > report/release-assets.tsv
+          : > report/apk-hashes.tsv
+          for repo in "${repos[@]}"; do
+            curl -fsSL --retry 4 -H 'Accept: application/vnd.github+json' \
+              "https://api.github.com/repos/${repo}/releases?per_page=100" -o "private/$(echo "$repo" | tr / _).json"
+            jq -r --arg repo "$repo" '.[] as $r | $r.assets[]? | [$repo,$r.tag_name,$r.name,.name,(.size|tostring),.browser_download_url] | @tsv' \
+              "private/$(echo "$repo" | tr / _).json" >> report/release-assets.tsv
+          done
+          while IFS=$'\t' read -r repo tag release asset size url; do
+            case "${asset,,}" in
+              *.apk)
+                safe="$(printf '%s_%s_%s' "$repo" "$tag" "$asset" | tr '/ :()' '_______' | tr -cd 'A-Za-z0-9._-')"
+                echo "Downloading $repo $tag $asset ($size)"
+                curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors "$url" -o "private/${safe}.apk"
+                digest="$(sha256sum "private/${safe}.apk" | awk '{print $1}')"
+                actual="$(stat -c%s "private/${safe}.apk")"
+                printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$digest" "$actual" "$repo" "$tag" "$release" "$asset" | tee -a report/apk-hashes.tsv
+                ;;
+            esac
+          done < report/release-assets.tsv
+          grep -E '^(81f826e03934dd76da63018cf86685c5d9def3b20ecf74d1ca4480af4112c044|89ac333b1ef5e2a84b19b81ed654a24a80519dc4fdf7922f8826422166458d6b|033fbfe9ae794cef2f56dc4d7d95146a99f7a6b7d26c57a04baa717ef00ce4e2|db101e73a69364c6d87cd96b76a933b8ecd13cae2aac040b2484cc6c72458efa)' report/apk-hashes.tsv > report/matching-apks.tsv || true
+          echo COMPLETE > report/result.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: historical-apk-release-audit
+          path: report/
+          retention-days: 3
