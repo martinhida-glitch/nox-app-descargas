@@ -1,0 +1,75 @@
+name: Preparar Release Fénix 360 V6.4.11
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/prepare-fenix360-6411-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.head_ref == 'agent/publish-fenix360-6411-20260803'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      OLD_TAG: v1.0.0
+      NEW_TAG: v6.4.11
+      OLD_SHA: 0ccdc90dbcf366db564b506a006ad018b981627c15b7995f593749a0b0b749fa
+      FINAL_SHA: db101e73a69364c6d87cd96b76a933b8ecd13cae2aac040b2484cc6c72458efa
+      ASSET: xuper-fenix-v6.apk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar y renombrar Release anterior
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p report private
+          gh release view "$OLD_TAG" --repo "$REPO" --json tagName,name,isDraft,isPrerelease,url,assets > report/old-release-before.json
+          gh release download "$OLD_TAG" --repo "$REPO" --pattern "$ASSET" --dir private/old --clobber
+          digest="$(sha256sum "private/old/$ASSET" | awk '{print $1}')"
+          test "$digest" = "$OLD_SHA"
+          gh release edit "$OLD_TAG" --repo "$REPO" \
+            --title 'Xuper Fénix V6.4.5 — Respaldo legado gratuito' \
+            --notes 'RESPALDO LEGADO. Versión gratuita anterior con publicidad. Se conserva únicamente para restauración técnica. La versión vigente será Fénix 360 V6.4.11.'
+          gh release view "$OLD_TAG" --repo "$REPO" --json tagName,name,isDraft,isPrerelease,url,assets > report/old-release-after.json
+
+      - name: Crear o normalizar borrador definitivo
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if gh release view "$NEW_TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release edit "$NEW_TAG" --repo "$REPO" \
+              --draft \
+              --title 'Fénix 360 V6.4.11 — Versión definitiva' \
+              --notes "Versión definitiva de Fénix 360. Demo de 7 días, suscripción, VPN interna, actualización obligatoria y control de acceso. Archivo obligatorio: ${ASSET}. SHA-256 esperado: ${FINAL_SHA}."
+          else
+            gh release create "$NEW_TAG" --repo "$REPO" \
+              --target main \
+              --draft \
+              --title 'Fénix 360 V6.4.11 — Versión definitiva' \
+              --notes "Versión definitiva de Fénix 360. Demo de 7 días, suscripción, VPN interna, actualización obligatoria y control de acceso. Archivo obligatorio: ${ASSET}. SHA-256 esperado: ${FINAL_SHA}."
+          fi
+          gh release view "$NEW_TAG" --repo "$REPO" --json tagName,name,isDraft,isPrerelease,url,assets > report/new-release-draft.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('report/new-release-draft.json'))
+          assert d['tagName']=='v6.4.11'
+          assert d['name']=='Fénix 360 V6.4.11 — Versión definitiva'
+          assert d['isDraft'] is True
+          assert d['isPrerelease'] is False
+          PY
+          printf '%s\n' "$FINAL_SHA  $ASSET" > report/EXPECTED_SHA256SUMS.txt
+          echo 'PREPARED: old release renamed; V6.4.11 draft created; old download remains active.' > report/result.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fenix360-release-preparation
+          path: report/
+          retention-days: 5
