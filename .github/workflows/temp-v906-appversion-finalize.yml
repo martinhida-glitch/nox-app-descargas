@@ -1,0 +1,111 @@
+name: TEMP Finalizar metadata V9.0.6
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/temp-v906-appversion-finalize.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: 25829b675a63b9e1ae90e90ca6a69f77
+      EXPECTED_SHA: 038c9d9ce80c02d54daa30dab0be484924691e481fd99b6dff1a3ca538834f72
+      APPVER_URL: https://fenix360-router-v2.pagos-noxplay.workers.dev/app-version
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch app-version to V9.0.6
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -u
+          python3 - <<'PY'
+          import os,re,json,subprocess,email,traceback,datetime
+          from email import policy
+          out={'tokenPresent':bool(os.environ.get('CF_TOKEN')),'accountPresent':bool(os.environ.get('CF_ACCOUNT'))}
+          try:
+            token=os.environ.get('CF_TOKEN',''); account=os.environ.get('CF_ACCOUNT','')
+            if not token: raise RuntimeError('missing CLOUDFLARE_API_TOKEN in nox-app-descargas')
+            worker='fenix360-router-v2'
+            api=f'https://api.cloudflare.com/client/v4/accounts/{account}/workers/scripts/{worker}'
+            h='/tmp/f.h'; b='/tmp/f.bin'
+            cp=subprocess.run(['curl','-sS','-D',h,'-H',f'Authorization: Bearer {token}',api,'-o',b,'-w','%{http_code}'],capture_output=True,text=True,check=False)
+            out['exportHttp']=cp.stdout[-3:] if cp.stdout else None
+            if cp.returncode or out['exportHttp']!='200': raise RuntimeError('worker export failed '+cp.stderr[-300:])
+            headers=open(h,errors='replace').read(); raw=open(b,'rb').read(); cts=re.findall(r'(?im)^content-type:\s*(.+?)\s*$',headers); ct=cts[-1] if cts else 'application/javascript'
+            meta=None; parts={}; entry=None
+            if 'multipart/' in ct.lower():
+              msg=email.message_from_bytes((f'Content-Type: {ct}\r\nMIME-Version: 1.0\r\n\r\n').encode()+raw,policy=policy.default)
+              for p in msg.iter_parts():
+                name=p.get_param('name',header='content-disposition') or p.get_filename() or ''; data=p.get_payload(decode=True) or b''
+                if name=='metadata': meta=json.loads(data.decode())
+                else: parts[name]=data
+              entry=(meta or {}).get('main_module') or (meta or {}).get('body_part')
+              if not entry:
+                js=[n for n in parts if n.endswith(('.js','.mjs'))]
+                if len(js)!=1: raise RuntimeError('cannot identify entrypoint')
+                entry=js[0]
+              src=parts[entry].decode()
+            else:
+              entry='worker.js'; src=raw.decode()
+
+            # Idempotent direct edit: no extra wrapper/fallback is introduced.
+            target_ok=('minimumVersionCode: 90014' in src and 'latestVersionCode: 90014' in src and 'latestVersionName: "9.0.6"' in src and os.environ['EXPECTED_SHA'] in src)
+            if not target_ok:
+              replacements={
+                'minimumVersionCode: 90012':'minimumVersionCode: 90014',
+                'latestVersionCode: 90012':'latestVersionCode: 90014',
+                'latestVersionName: "9.0.4"':'latestVersionName: "9.0.6"',
+                '44fc680f4e844d3b2188aec4c28b724f37e096639b172de2d12ea7720e1fa624':os.environ['EXPECTED_SHA'],
+                'Actualización obligatoria: instalá XUPER FENIX V9.0.4 para continuar.':'Actualización obligatoria: instalá XUPER FENIX V9.0.6 para continuar.'
+              }
+              missing=[k for k in list(replacements)[:4] if k not in src]
+              if missing: raise RuntimeError('expected V9.0.4 anchors missing: '+repr(missing))
+              for a,z in replacements.items(): src=src.replace(a,z)
+
+              if meta is not None:
+                parts[entry]=src.encode(); boundary='----V906FinalizeBoundary'; chunks=[]
+                def add(name,data,ctype,filename=None):
+                  chunks.append(f'--{boundary}\r\n'.encode()); disp=f'Content-Disposition: form-data; name="{name}"'+(f'; filename="{filename}"' if filename else '')
+                  chunks.append((disp+'\r\n').encode()); chunks.append(f'Content-Type: {ctype}\r\n\r\n'.encode()); chunks.append(data); chunks.append(b'\r\n')
+                add('metadata',json.dumps(meta,separators=(',',':')).encode(),'application/json')
+                for name,data in parts.items(): add(name,data,'application/javascript+module' if name==entry else 'application/octet-stream',name)
+                chunks.append(f'--{boundary}--\r\n'.encode()); body=b''.join(chunks); upct=f'multipart/form-data; boundary={boundary}'
+              else:
+                body=src.encode(); upct='application/javascript'
+              open('/tmp/upload.bin','wb').write(body)
+              cp=subprocess.run(['curl','-sS','-X','PUT','-H',f'Authorization: Bearer {token}','-H',f'Content-Type: {upct}','--data-binary','@/tmp/upload.bin',api+'/content','-w','%{http_code}','-o','/tmp/upload-response.json'],capture_output=True,text=True,check=False)
+              out['uploadHttp']=cp.stdout[-3:] if cp.stdout else None
+              if cp.returncode or out['uploadHttp']!='200': raise RuntimeError('worker upload failed '+cp.stderr[-300:])
+
+            # Validate live app-version and critical access route.
+            for _ in range(12):
+              cp=subprocess.run(['curl','-fsSL','--max-time','30',os.environ['APPVER_URL']+'?v='+str(datetime.datetime.now().timestamp())],capture_output=True,text=True)
+              if cp.returncode==0:
+                try:
+                  j=json.loads(cp.stdout)
+                  if j.get('minimumVersionCode')==90014 and j.get('latestVersionCode')==90014 and j.get('latestVersionName')=='9.0.6' and j.get('sha256')==os.environ['EXPECTED_SHA']:
+                    out['appVersion']=j; break
+                except: pass
+              import time; time.sleep(5)
+            else: raise RuntimeError('live app-version did not converge to V9.0.6')
+            a=subprocess.check_output(['curl','-fsSL','--max-time','30','https://fenix360-router-v2.pagos-noxplay.workers.dev/api/v2/access?device=45dfd4ba316a97a1'],text=True)
+            out['access']=json.loads(a)
+            if not (out['access'].get('ok') and out['access'].get('allowed')): raise RuntimeError('critical access route unhealthy')
+            out['status']='V9.0.6_APP_VERSION_ACTIVE'
+          except Exception as e:
+            out['status']='FAILED'; out['error']=repr(e); out['trace']=traceback.format_exc()[-3000:]
+          open('/tmp/status.json','w').write(json.dumps(out,indent=2,ensure_ascii=False)+'\n')
+          print(json.dumps(out,indent=2,ensure_ascii=False))
+          PY
+          B64=$(base64 -w0 /tmp/status.json)
+          API="repos/${GITHUB_REPOSITORY}/contents/V906_APP_VERSION_STATUS.json"
+          OLD=$(gh api "$API?ref=main" --jq '.sha' 2>/dev/null || true)
+          if [ -n "$OLD" ]; then gh api --method PUT "$API" -f message='prod: estado app-version V9.0.6' -f content="$B64" -f sha="$OLD" -f branch=main >/dev/null; else gh api --method PUT "$API" -f message='prod: estado app-version V9.0.6' -f content="$B64" -f branch=main >/dev/null; fi
