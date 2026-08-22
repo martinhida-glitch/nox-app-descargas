@@ -1,13 +1,20 @@
 {
-  "startedAtUtc": "2026-08-22T02:16:41.227837+00:00",
+  "startedAtUtc": "2026-08-22T02:17:50.582921+00:00",
   "tokenPresent": true,
   "publicApkSha256": "038c9d9ce80c02d54daa30dab0be484924691e481fd99b6dff1a3ca538834f72",
+  "publicBinaryExact": true,
   "exportHttp": "200",
-  "exportContentType": "multipart/form-data; boundary=5054affbcdcfb3b545583b307bb2c52e7f072892c8aba46bc750cfd8da23",
-  "targetMetadataFound": true,
-  "uploadHttp": "415",
+  "exportContentType": "multipart/form-data; boundary=7a4f3037d91e2fd906460dd46dbb3c93222c35a80baef09dadb7672edb70",
+  "replacementCounts": {
+    "minimumVersionCode": 1,
+    "latestVersionCode": 1,
+    "latestVersionName": 1,
+    "sha256": 1,
+    "message": 1
+  },
+  "uploadHttp": "400",
   "status": "FAILED",
-  "error": "RuntimeError('upload failed HTTP 415 {\\n  \"result\": null,\\n  \"success\": false,\\n  \"errors\": [\\n    {\\n      \"code\": 10001,\\n      \"message\": \"Content-Type must be one of: application/javascript, text/javascript, multipart/form-data\"\\n    }\\n  ],\\n  \"messages\": []\\n}\\n')",
-  "trace": "Traceback (most recent call last):\n  File \"<stdin>\", line 31, in <module>\nRuntimeError: upload failed HTTP 415 {\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10001,\n      \"message\": \"Content-Type must be one of: application/javascript, text/javascript, multipart/form-data\"\n    }\n  ],\n  \"messages\": []\n}\n\n",
-  "checkedAtUtc": "2026-08-22T02:16:44.748706+00:00"
+  "error": "RuntimeError('multipart upload failed HTTP 400 {\\n  \"result\": null,\\n  \"success\": false,\\n  \"errors\": [\\n    {\\n      \"code\": 10021,\\n      \"message\": \"Could not read content for part \\'metadata\\'.\",\\n      \"documentation_url\": \"https://developers.cloudflare.com/workers/observability/errors/#validation-errors-10021\"\\n    }\\n  ],\\n  \"messages\": []\\n}\\n')",
+  "trace": "Traceback (most recent call last):\n  File \"<stdin>\", line 45, in <module>\nRuntimeError: multipart upload failed HTTP 400 {\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10021,\n      \"message\": \"Could not read content for part 'metadata'.\",\n      \"documentation_url\": \"https://developers.cloudflare.com/workers/observability/errors/#validation-errors-10021\"\n    }\n  ],\n  \"messages\": []\n}\n\n",
+  "checkedAtUtc": "2026-08-22T02:17:51.903004+00:00"
 }
