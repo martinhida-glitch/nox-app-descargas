@@ -1,0 +1,60 @@
+name: Inspect V9.0.6 Worker multipart
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/inspect-v906-worker-multipart.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: 25829b675a63b9e1ae90e90ca6a69f77
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect multipart safely
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,re,json,subprocess,email
+          from email import policy
+          token=os.environ['CF_TOKEN']; account=os.environ['CF_ACCOUNT']
+          api=f'https://api.cloudflare.com/client/v4/accounts/{account}/workers/scripts/fenix360-router-v2'
+          cp=subprocess.run(['curl','-sS','-D','/tmp/h','-H',f'Authorization: Bearer {token}',api,'-o','/tmp/body','-w','%{http_code}'],capture_output=True,text=True)
+          out={'http':(cp.stdout or '')[-3:]}
+          headers=open('/tmp/h',errors='replace').read(); raw=open('/tmp/body','rb').read()
+          cts=re.findall(r'(?im)^content-type:\s*(.+?)\s*$',headers); ct=cts[-1] if cts else ''
+          out['contentType']=ct; out['rawBytes']=len(raw)
+          msg=email.message_from_bytes((f'Content-Type: {ct}\r\nMIME-Version: 1.0\r\n\r\n').encode()+raw,policy=policy.default)
+          parts=[]; meta=None
+          for i,p in enumerate(msg.iter_parts()):
+            name=p.get_param('name',header='content-disposition') or p.get_filename() or ''
+            data=p.get_payload(decode=True) or b''
+            rec={'index':i,'name':name,'contentType':p.get_content_type(),'contentDisposition':p.get('Content-Disposition'),'bytes':len(data),'filename':p.get_filename()}
+            parts.append(rec)
+            if name=='metadata':
+              try:
+                m=json.loads(data.decode())
+                # Only structural fields; never persist secret/text values.
+                meta={'main_module':m.get('main_module'),'body_part':m.get('body_part'),'compatibility_date':m.get('compatibility_date'),'compatibility_flags':m.get('compatibility_flags')}
+                binds=[]
+                for b in m.get('bindings',[]) or []:
+                  binds.append({k:b.get(k) for k in ('name','type','namespace','id','class_name','service','environment') if b.get(k) is not None})
+                meta['bindings']=binds
+              except Exception as e:
+                meta={'parseError':repr(e),'preview':data[:120].decode(errors='replace')}
+          out['metadata']=meta; out['parts']=parts
+          open('/tmp/out.json','w').write(json.dumps(out,indent=2,ensure_ascii=False)+'\n')
+          PY
+          B64=$(base64 -w0 /tmp/out.json)
+          API="repos/${GITHUB_REPOSITORY}/contents/V906_WORKER_MULTIPART_STRUCTURE.json"
+          OLD=$(gh api "$API?ref=main" --jq '.sha' 2>/dev/null || true)
+          if [ -n "$OLD" ]; then gh api --method PUT "$API" -f message='diag: estructura multipart Worker V9.0.6' -f content="$B64" -f sha="$OLD" -f branch=main >/dev/null; else gh api --method PUT "$API" -f message='diag: estructura multipart Worker V9.0.6' -f content="$B64" -f branch=main >/dev/null; fi
