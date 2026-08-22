@@ -1,0 +1,23 @@
+{
+  "status": "V9.0.6_038C_PROMOTED_TO_STABLE_ASSET",
+  "checkedAtUtc": "2026-08-22T00:49:22.979765+00:00",
+  "tag": "v9.0.6",
+  "sourceAsset": "XUPER_FENIX_V9.0.6_FUNCIONAL_038C.apk",
+  "stableAsset": "xuper-fenix-v6.apk",
+  "expectedSha256": "038c9d9ce80c02d54daa30dab0be484924691e481fd99b6dff1a3ca538834f72",
+  "publicSha256": "038c9d9ce80c02d54daa30dab0be484924691e481fd99b6dff1a3ca538834f72",
+  "publicBinaryExact": true,
+  "publicUrl": "https://nox-descargas.pagos-noxplay.workers.dev/fenix",
+  "downloaderCode": "8272460",
+  "appVersionAtPromotion": {
+    "ok": true,
+    "minimumVersionCode": 90012,
+    "latestVersionCode": 90012,
+    "latestVersionName": "9.0.4",
+    "mandatory": true,
+    "downloadUrl": "https://nox-descargas.pagos-noxplay.workers.dev/fenix",
+    "sha256": "44fc680f4e844d3b2188aec4c28b724f37e096639b172de2d12ea7720e1fa624",
+    "message": "Actualización obligatoria: instalá XUPER FENIX V9.0.4 para continuar.",
+    "checkedAt": "2026-08-22T00:49:22.954Z"
+  }
+}
