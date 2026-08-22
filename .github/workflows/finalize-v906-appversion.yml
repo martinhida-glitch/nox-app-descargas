@@ -1,0 +1,172 @@
+name: Finalizar metadata XUPER FENIX V9.0.6
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/finalize-v906-appversion.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: 25829b675a63b9e1ae90e90ca6a69f77
+      EXPECTED_SHA: 038c9d9ce80c02d54daa30dab0be484924691e481fd99b6dff1a3ca538834f72
+      APPVER_URL: https://fenix360-router-v2.pagos-noxplay.workers.dev/app-version
+      ACCESS_URL: https://fenix360-router-v2.pagos-noxplay.workers.dev/api/v2/access?device=45dfd4ba316a97a1
+      SUB_URL: https://fenix360-router-v2.pagos-noxplay.workers.dev/suscripcion?device=45dfd4ba316a97a1
+      PUBLIC_APK: https://nox-descargas.pagos-noxplay.workers.dev/fenix
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate public APK first
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_TOKEN"
+          curl -fsSL --max-time 180 "$PUBLIC_APK?verify=$(date +%s)" -o /tmp/public.apk
+          ACTUAL=$(sha256sum /tmp/public.apk | awk '{print $1}')
+          echo "PUBLIC_SHA=$ACTUAL"
+          test "$ACTUAL" = "$EXPECTED_SHA"
+
+      - name: Patch live app-version metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,re,json,subprocess,email
+          from email import policy
+
+          token=os.environ['CF_TOKEN']; account=os.environ['CF_ACCOUNT']; expected=os.environ['EXPECTED_SHA']
+          worker='fenix360-router-v2'
+          api=f'https://api.cloudflare.com/client/v4/accounts/{account}/workers/scripts/{worker}'
+          h='/tmp/cf.h'; b='/tmp/cf.bin'
+          cp=subprocess.run(['curl','-sS','-D',h,'-H',f'Authorization: Bearer {token}',api,'-o',b,'-w','%{http_code}'],capture_output=True,text=True)
+          http=(cp.stdout or '')[-3:]
+          if cp.returncode or http!='200': raise SystemExit(f'Worker export failed rc={cp.returncode} http={http} err={cp.stderr[-300:]}')
+
+          headers=open(h,errors='replace').read(); raw=open(b,'rb').read()
+          cts=re.findall(r'(?im)^content-type:\s*(.+?)\s*$',headers); ct=cts[-1] if cts else 'application/javascript'
+          meta=None; parts={}; entry=None
+          if 'multipart/' in ct.lower():
+              msg=email.message_from_bytes((f'Content-Type: {ct}\r\nMIME-Version: 1.0\r\n\r\n').encode()+raw,policy=policy.default)
+              for p in msg.iter_parts():
+                  name=p.get_param('name',header='content-disposition') or p.get_filename() or ''
+                  data=p.get_payload(decode=True) or b''
+                  if name=='metadata': meta=json.loads(data.decode())
+                  else: parts[name]=data
+              entry=(meta or {}).get('main_module') or (meta or {}).get('body_part')
+              if not entry:
+                  js=[n for n in parts if n.endswith(('.js','.mjs'))]
+                  if len(js)!=1: raise SystemExit('Cannot identify worker entrypoint')
+                  entry=js[0]
+              src=parts[entry].decode()
+          else:
+              entry='worker.js'; src=raw.decode()
+
+          before=src
+          # Idempotent and narrow: change only the already-existing V9.0.4 update metadata anchors.
+          replacements=[
+            (r'(minimumVersionCode\s*:\s*)90012\b',r'\g<1>90014'),
+            (r'(latestVersionCode\s*:\s*)90012\b',r'\g<1>90014'),
+            (r'(latestVersionName\s*:\s*["\'])9\.0\.4(["\'])',r'\g<1>9.0.6\2'),
+            (re.escape('44fc680f4e844d3b2188aec4c28b724f37e096639b172de2d12ea7720e1fa624'),expected),
+            (re.escape('Actualización obligatoria: instalá XUPER FENIX V9.0.4 para continuar.'),'Actualización obligatoria: instalá XUPER FENIX V9.0.6 para continuar.')
+          ]
+          for pat,rep in replacements:
+              src=re.sub(pat,rep,src)
+
+          target=(re.search(r'minimumVersionCode\s*:\s*90014\b',src) and
+                  re.search(r'latestVersionCode\s*:\s*90014\b',src) and
+                  re.search(r'latestVersionName\s*:\s*["\']9\.0\.6["\']',src) and expected in src)
+          if not target:
+              raise SystemExit('Refusing deploy: V9.0.6 target metadata not fully present after narrow patch')
+
+          if src!=before:
+              if meta is not None:
+                  parts[entry]=src.encode(); boundary='----V906FinalBoundary'; chunks=[]
+                  def add(name,data,ctype,filename=None):
+                      chunks.append(f'--{boundary}\r\n'.encode())
+                      disp=f'Content-Disposition: form-data; name="{name}"'+(f'; filename="{filename}"' if filename else '')
+                      chunks.append((disp+'\r\n').encode()); chunks.append(f'Content-Type: {ctype}\r\n\r\n'.encode()); chunks.append(data); chunks.append(b'\r\n')
+                  add('metadata',json.dumps(meta,separators=(',',':')).encode(),'application/json')
+                  for name,data in parts.items():
+                      add(name,data,'application/javascript+module' if name==entry else 'application/octet-stream',name)
+                  chunks.append(f'--{boundary}--\r\n'.encode()); body=b''.join(chunks); upct=f'multipart/form-data; boundary={boundary}'
+              else:
+                  body=src.encode(); upct='application/javascript'
+              open('/tmp/upload.bin','wb').write(body)
+              cp=subprocess.run(['curl','-sS','-X','PUT','-H',f'Authorization: Bearer {token}','-H',f'Content-Type: {upct}','--data-binary','@/tmp/upload.bin',api+'/content','-o','/tmp/up.json','-w','%{http_code}'],capture_output=True,text=True)
+              http=(cp.stdout or '')[-3:]
+              if cp.returncode or http not in ('200','201'): raise SystemExit(f'Worker upload failed rc={cp.returncode} http={http} err={cp.stderr[-300:]}')
+              print('worker metadata patched')
+          else:
+              print('worker already at target metadata')
+          PY
+
+      - name: Validate live endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          sleep 5
+          ok=0
+          for i in $(seq 1 12); do
+            if curl -fsSL --max-time 30 "$APPVER_URL?verify=$RANDOM-$i" -o /tmp/app.json; then
+              if python3 - <<'PY'
+          import json,os
+          j=json.load(open('/tmp/app.json'))
+          ok=(j.get('minimumVersionCode')==90014 and j.get('latestVersionCode')==90014 and j.get('latestVersionName')=='9.0.6' and j.get('sha256')==os.environ['EXPECTED_SHA'] and j.get('mandatory') is True and j.get('downloadUrl')=='https://nox-descargas.pagos-noxplay.workers.dev/fenix')
+          raise SystemExit(0 if ok else 1)
+          PY
+              then ok=1; break; fi
+            fi
+            sleep 5
+          done
+          test "$ok" = 1
+          curl -fsSL --max-time 30 "$ACCESS_URL" -o /tmp/access.json
+          curl -fsSL --max-time 30 "$SUB_URL" -o /tmp/subscription.out
+          python3 - <<'PY'
+          import json
+          a=json.load(open('/tmp/access.json'))
+          assert a.get('ok') is True and a.get('allowed') is True,a
+          PY
+
+      - name: Persist final status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > /tmp/status.json
+          import json,hashlib,datetime,os
+          app=json.load(open('/tmp/app.json')); access=json.load(open('/tmp/access.json'))
+          pub=hashlib.sha256(open('/tmp/public.apk','rb').read()).hexdigest()
+          print(json.dumps({
+            'status':'XUPER_FENIX_V9.0.6_FINALIZED',
+            'checkedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'minimumVersionCode':app.get('minimumVersionCode'),
+            'latestVersionCode':app.get('latestVersionCode'),
+            'latestVersionName':app.get('latestVersionName'),
+            'mandatory':app.get('mandatory'),
+            'sha256':app.get('sha256'),
+            'downloadUrl':app.get('downloadUrl'),
+            'publicApkSha256':pub,
+            'publicBinaryExact':pub==os.environ['EXPECTED_SHA'],
+            'accessHealthy':bool(access.get('ok') and access.get('allowed')),
+            'subscriptionRouteHttpOk':True,
+            'downloaderCode':'8272460',
+            'physicalCleanInstallValidatedByOwner':True
+          },indent=2,ensure_ascii=False))
+          PY
+          B64=$(base64 -w0 /tmp/status.json)
+          API="repos/${GITHUB_REPOSITORY}/contents/V906_FINAL_STATUS.json"
+          OLD=$(gh api "$API?ref=main" --jq '.sha' 2>/dev/null || true)
+          if [ -n "$OLD" ]; then
+            gh api --method PUT "$API" -f message='prod: XUPER FENIX V9.0.6 finalizada' -f content="$B64" -f sha="$OLD" -f branch=main >/dev/null
+          else
+            gh api --method PUT "$API" -f message='prod: XUPER FENIX V9.0.6 finalizada' -f content="$B64" -f branch=main >/dev/null
+          fi
