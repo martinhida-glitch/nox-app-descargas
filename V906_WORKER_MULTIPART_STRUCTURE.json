@@ -1,0 +1,16 @@
+{
+  "http": "200",
+  "contentType": "multipart/form-data; boundary=d83ef3f0aecfbc9838466fa73ea096c013dfd52a355b31c4fcb6b295f4e3",
+  "rawBytes": 163947,
+  "metadata": null,
+  "parts": [
+    {
+      "index": 0,
+      "name": "index.js",
+      "contentType": "text/plain",
+      "contentDisposition": "form-data; name=\"index.js\"",
+      "bytes": 163764,
+      "filename": null
+    }
+  ]
+}
