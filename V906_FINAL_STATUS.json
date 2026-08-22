@@ -1,0 +1,14 @@
+{
+  "startedAtUtc": "2026-08-22T02:15:32.925027+00:00",
+  "tokenPresent": true,
+  "accountPresent": true,
+  "publicApkSha256": "038c9d9ce80c02d54daa30dab0be484924691e481fd99b6dff1a3ca538834f72",
+  "publicBinaryExact": true,
+  "workerExportHttp": "200",
+  "targetMetadataFound": true,
+  "workerUploadHttp": "400",
+  "status": "FAILED",
+  "error": "RuntimeError('Cloudflare Worker upload failed HTTP 400 {\\n  \"result\": null,\\n  \"success\": false,\\n  \"errors\": [\\n    {\\n      \"code\": 10021,\\n      \"message\": \"Uncaught SyntaxError: Cannot use import statement outside a module\\\\n  at worker.js:1\\\\n\",\\n      \"documentation_url\": \"https://developers.cloudflare.com/workers/observability/errors/#validation-errors-10021\"\\n    }\\n  ],\\n  \"messages\": []\\n}\\n')",
+  "trace": "Traceback (most recent call last):\n  File \"<stdin>\", line 86, in <module>\nRuntimeError: Cloudflare Worker upload failed HTTP 400 {\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10021,\n      \"message\": \"Uncaught SyntaxError: Cannot use import statement outside a module\\n  at worker.js:1\\n\",\n      \"documentation_url\": \"https://developers.cloudflare.com/workers/observability/errors/#validation-errors-10021\"\n    }\n  ],\n  \"messages\": []\n}\n\n",
+  "checkedAtUtc": "2026-08-22T02:15:34.721533+00:00"
+}
