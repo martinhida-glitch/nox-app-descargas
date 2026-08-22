@@ -1,10 +1,9 @@
 {
-  "startedAtUtc": "2026-08-22T02:17:50.582921+00:00",
+  "startedAtUtc": "2026-08-22T02:19:35.457783+00:00",
   "tokenPresent": true,
   "publicApkSha256": "038c9d9ce80c02d54daa30dab0be484924691e481fd99b6dff1a3ca538834f72",
   "publicBinaryExact": true,
   "exportHttp": "200",
-  "exportContentType": "multipart/form-data; boundary=7a4f3037d91e2fd906460dd46dbb3c93222c35a80baef09dadb7672edb70",
   "replacementCounts": {
     "minimumVersionCode": 1,
     "latestVersionCode": 1,
@@ -12,9 +11,30 @@
     "sha256": 1,
     "message": 1
   },
-  "uploadHttp": "400",
-  "status": "FAILED",
-  "error": "RuntimeError('multipart upload failed HTTP 400 {\\n  \"result\": null,\\n  \"success\": false,\\n  \"errors\": [\\n    {\\n      \"code\": 10021,\\n      \"message\": \"Could not read content for part \\'metadata\\'.\",\\n      \"documentation_url\": \"https://developers.cloudflare.com/workers/observability/errors/#validation-errors-10021\"\\n    }\\n  ],\\n  \"messages\": []\\n}\\n')",
-  "trace": "Traceback (most recent call last):\n  File \"<stdin>\", line 45, in <module>\nRuntimeError: multipart upload failed HTTP 400 {\n  \"result\": null,\n  \"success\": false,\n  \"errors\": [\n    {\n      \"code\": 10021,\n      \"message\": \"Could not read content for part 'metadata'.\",\n      \"documentation_url\": \"https://developers.cloudflare.com/workers/observability/errors/#validation-errors-10021\"\n    }\n  ],\n  \"messages\": []\n}\n\n",
-  "checkedAtUtc": "2026-08-22T02:17:51.903004+00:00"
+  "uploadHttp": "200",
+  "appVersion": {
+    "ok": true,
+    "minimumVersionCode": 90014,
+    "latestVersionCode": 90014,
+    "latestVersionName": "9.0.6",
+    "mandatory": true,
+    "downloadUrl": "https://nox-descargas.pagos-noxplay.workers.dev/fenix",
+    "sha256": "038c9d9ce80c02d54daa30dab0be484924691e481fd99b6dff1a3ca538834f72",
+    "message": "Actualización obligatoria: instalá XUPER FENIX V9.0.6 para continuar.",
+    "checkedAt": "2026-08-22T02:19:42.290Z"
+  },
+  "access": {
+    "ok": true,
+    "allowed": true,
+    "active": true,
+    "trial": false,
+    "status": "active",
+    "deviceId": "45dfd4ba316a97a1",
+    "expiresAt": "2028-09-13T18:45:00.000Z",
+    "remainingSeconds": 65118317,
+    "serverTime": "2026-08-22T02:19:42.353Z"
+  },
+  "subscriptionRouteHttpOk": true,
+  "status": "XUPER_FENIX_V9.0.6_FINALIZED",
+  "checkedAtUtc": "2026-08-22T02:19:42.460513+00:00"
 }
