@@ -1,0 +1,39 @@
+name: Stage Ultra8K Latino V1.0.1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/stage-ultra8k-v101.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download verified signed artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-679c-820e-b15e-701d1d946d6b/raw?se=2026-10-06T22%3A25%3A43Z&sp=r&sv=2026-02-06&sr=b&scid=dc724c7c-32d4-50fa-9cda-4a2e2129e717&skoid=9fcafdab-1a9a-48a1-833e-6f0dce81fc66&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-06T11%3A31%3A36Z&ske=2026-10-07T11%3A31%3A36Z&sks=b&skv=2026-02-06&sig=TYrDxNyXo9ZfcPH4EEUW7jVqnRVkuOwcX1heZ2ikD8U%3D' -o /tmp/u8k.zip
+          mkdir -p /tmp/u8k
+          unzip -q /tmp/u8k.zip -d /tmp/u8k
+          test -s /tmp/u8k/Ultra8kLatino-V1.0.1.apk
+          echo '5a088f2d701b26dac954cfe36ca31f4b4f528696ec36709cdd4bc3eb148d3c37  /tmp/u8k/Ultra8kLatino-V1.0.1.apk' | sha256sum -c -
+      - name: Stage Ultra8K APK without touching Xuper files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ultra8k
+          cp /tmp/u8k/Ultra8kLatino-V1.0.1.apk ultra8k/Ultra8kLatino-V1.0.1.apk
+          cp /tmp/u8k/Ultra8kLatino-V1.0.1.apk ultra8k/latest.apk
+          printf '%s\n' '5a088f2d701b26dac954cfe36ca31f4b4f528696ec36709cdd4bc3eb148d3c37  Ultra8kLatino-V1.0.1.apk' > ultra8k/SHA256SUMS.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ultra8k
+          git commit -m 'stage: Ultra8K Latino V1.0.1 (271)'
+          git push
