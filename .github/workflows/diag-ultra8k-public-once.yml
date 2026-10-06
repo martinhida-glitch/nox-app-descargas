@@ -1,4 +1,4 @@
-name: Diagnose Ultra8K Public Once
+name: Diagnose Ultra8K Public Once v2
 on:
   push:
     branches: [main]
