@@ -1,4 +1,4 @@
-name: Diagnose Ultra8K Public Once v3
+name: Diagnose Ultra8K Public Once v4
 on:
   push:
     branches: [main]
@@ -8,11 +8,12 @@ jobs:
   diag:
     runs-on: ubuntu-latest
     steps:
-      - name: Show public APK SHA and size
+      - name: Compare pinned mirror and public stable URL
         shell: bash
         run: |
-          set +e
-          curl -fL --max-time 180 "https://ultra8klatino.com/download/latest.apk?diag=$(date +%s)" -o /tmp/latest.apk
-          echo "SHA=$(sha256sum /tmp/latest.apk | awk '{print $1}')"
-          echo "SIZE=$(stat -c %s /tmp/latest.apk)"
-          curl -fsS https://ultra8klatino.com/release.json
+          set -euo pipefail
+          curl -fL --max-time 180 "https://raw.githubusercontent.com/martinhida-glitch/nox-app-descargas/c5b4829fa2889fdb62bfd6165e60033a9e0243c8/ultra8k/Ultra8kLatino-V1.0.1.apk" -o /tmp/mirror.apk
+          curl -fL --max-time 180 "https://ultra8klatino.com/download/latest.apk?diag=$(date +%s)" -o /tmp/site.apk
+          echo "MIRROR_SHA=$(sha256sum /tmp/mirror.apk | awk '{print $1}') MIRROR_SIZE=$(stat -c %s /tmp/mirror.apk)"
+          echo "SITE_SHA=$(sha256sum /tmp/site.apk | awk '{print $1}') SITE_SIZE=$(stat -c %s /tmp/site.apk)"
+          curl -fsSI "https://ultra8klatino.com/download/latest.apk?head=$(date +%s)" | sed -n '1,25p'
