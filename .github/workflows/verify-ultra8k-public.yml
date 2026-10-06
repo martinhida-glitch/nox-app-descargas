@@ -9,13 +9,21 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify public manifest and stable APK
+      - name: Verify public manifest and stable APK after KV propagation
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsS --retry 5 --retry-delay 2 --max-time 60 https://ultra8klatino.com/release.json -o /tmp/release.json
+          EXPECTED=5a088f2d701b26dac954cfe36ca31f4b4f528696ec36709cdd4bc3eb148d3c37
+          curl -fsS --retry 5 https://ultra8klatino.com/release.json -o /tmp/release.json
           cat /tmp/release.json
-          jq -e '.package=="com.ultra8k.player" and .versionName=="1.0.1" and .versionCode==271 and .sha256=="5a088f2d701b26dac954cfe36ca31f4b4f528696ec36709cdd4bc3eb148d3c37" and .critical==false' /tmp/release.json >/dev/null
-          curl -fL --retry 5 --retry-delay 2 --max-time 180 https://ultra8klatino.com/download/latest.apk -o /tmp/latest.apk
-          echo '5a088f2d701b26dac954cfe36ca31f4b4f528696ec36709cdd4bc3eb148d3c37  /tmp/latest.apk' | sha256sum -c -
-          test "$(stat -c %s /tmp/latest.apk)" = "20569832"
+          jq -e '.package=="com.ultra8k.player" and .versionName=="1.0.1" and .versionCode==271 and .sha256=="'"${EXPECTED}"'" and .critical==false' /tmp/release.json >/dev/null
+          for i in $(seq 1 18); do
+            rm -f /tmp/latest.apk
+            curl -fL --retry 3 --max-time 180 "https://ultra8klatino.com/download/latest.apk?verify=${i}" -o /tmp/latest.apk
+            ACTUAL=$(sha256sum /tmp/latest.apk | awk '{print $1}')
+            SIZE=$(stat -c %s /tmp/latest.apk)
+            echo "attempt=${i} sha=${ACTUAL} size=${SIZE}"
+            if [ "$ACTUAL" = "$EXPECTED" ] && [ "$SIZE" = "20569832" ]; then exit 0; fi
+            sleep 10
+          done
+          exit 1
