@@ -1,0 +1,18 @@
+name: Diagnose Ultra8K Public Once
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/diag-ultra8k-public-once.yml
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show public APK SHA and size
+        shell: bash
+        run: |
+          set +e
+          curl -fL --max-time 180 "https://ultra8klatino.com/download/latest.apk?diag=$(date +%s)" -o /tmp/latest.apk
+          echo "SHA=$(sha256sum /tmp/latest.apk | awk '{print $1}')"
+          echo "SIZE=$(stat -c %s /tmp/latest.apk)"
+          curl -fsS https://ultra8klatino.com/release.json
