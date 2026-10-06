@@ -1,0 +1,20 @@
+name: Trigger Ultra8K KV Import
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/trigger-ultra8k-import.yml
+  workflow_dispatch:
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Import verified Ultra8K APK into official KV
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 5 --retry-delay 2 --max-time 180 \
+            https://ultra8k-release-importer.pagos-noxplay.workers.dev/import \
+            -o /tmp/result.json
+          cat /tmp/result.json
+          jq -e '.ok == true and .sha == "5a088f2d701b26dac954cfe36ca31f4b4f528696ec36709cdd4bc3eb148d3c37" and .size == 20569832' /tmp/result.json >/dev/null
