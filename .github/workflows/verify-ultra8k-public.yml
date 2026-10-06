@@ -1,0 +1,21 @@
+name: Verify Ultra8K Public V1.0.1
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-ultra8k-public.yml
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify public manifest and stable APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 5 --retry-delay 2 --max-time 60 https://ultra8klatino.com/release.json -o /tmp/release.json
+          cat /tmp/release.json
+          jq -e '.package=="com.ultra8k.player" and .versionName=="1.0.1" and .versionCode==271 and .sha256=="5a088f2d701b26dac954cfe36ca31f4b4f528696ec36709cdd4bc3eb148d3c37" and .critical==false' /tmp/release.json >/dev/null
+          curl -fL --retry 5 --retry-delay 2 --max-time 180 https://ultra8klatino.com/download/latest.apk -o /tmp/latest.apk
+          echo '5a088f2d701b26dac954cfe36ca31f4b4f528696ec36709cdd4bc3eb148d3c37  /tmp/latest.apk' | sha256sum -c -
+          test "$(stat -c %s /tmp/latest.apk)" = "20569832"
