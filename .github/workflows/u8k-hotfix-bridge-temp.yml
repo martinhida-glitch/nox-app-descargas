@@ -1,0 +1,48 @@
+name: U8K hotfix publication bridge temp
+
+on:
+  push:
+    branches: [u8k-hotfix-bridge-temp]
+    paths: ['.github/workflows/u8k-hotfix-bridge-temp.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_SHA: 104dad193ea982211bd45fe36d8c717eb0edf85c7deecc1f6cd082ac755a0650
+      EXPECTED_SIZE: '20519464'
+      SOURCE_URL_B64: aHR0cHM6Ly9yZWxlYXNlLWFzc2V0cy5naXRodWJ1c2VyY29udGVudC5jb20vZ2l0aHViLXByb2R1Y3Rpb24tcmVsZWFzZS1hc3NldC8xMzk0MTY1ODM2L2FjY2VkMjA4LWEyMjYtNGFhOS1iOTI5LWJjOTg5NDdhYjk5MD9zcD1yJnN2PTIwMTgtMTEtMDkmc3I9YiZzcHI9aHR0cHMmc2U9MjAyNi0xMC0wNlQwMyUzQTQwJTNBMjRaJnJzY2Q9YXR0YWNobWVudCUzQitmaWxlbmFtZSUzRFVsdHJhOGtMYXRpbm8tVjEuMC5hcGsmcnNjdD1hcHBsaWNhdGlvbiUyRnZuZC5hbmRyb2lkLnBhY2thZ2UtYXJjaGl2ZSZza29pZD05NmMyZDQxMC01NzExLTQzYTEtYWVkZC1hYjE5NDdhYTdhYjAmc2t0aWQ9Mzk4YTY2NTQtOTk3Yi00N2U5LWIxMmItOTUxNWI4OTZiNGRlJnNrdD0yMDI2LTEwLTA2VDAyJTNBNDAlM0EyMFomc2tlPTIwMjYtMTAtMDZUMDMlM0E0MCUzQTI0WiZza3M9YiZza3Y9MjAxOC0xMS0wOSZzaWc9UWI3WlNSZzVSZTlJNDF3JTJGcERBZWpweHdneTRFQTFUN0R6cHN0VGxIJTJCZEUlM0Qmand0PWV5SjBlWEFpT2lKS1YxUWlMQ0poYkdjaU9pSklVekkxTmlKOS5leUpwYzNNaU9pSm5hWFJvZFdJdVkyOXRJaXdpWVhWa0lqb2ljbVZzWldGelpTMWhjM05sZEhNdVoybDBhSFZpZFhObGNtTnZiblJsYm5RdVkyOXRJaXdpYTJWNUlqb2lhMlY1TVNJc0ltVjRjQ0k2TVRjNU1USTFOakl5TUN3aWJtSm1Jam94TnpreE1qVTBOREl3TENKd1lYUm9Jam9pY21Wc1pXRnpaV0Z6YzJWMGNISnZaSFZqZEdsdmJpNWliRzlpTG1OdmNtVXVkMmx1Wkc5M2N5NXVaWFFpZlEuOEZ4NzA5YU02UmFIb001bC1VY0hjMGxvNlR5V1BMdUNjOWNVb0MwNDlUcyZyZXNwb25zZS1jb250ZW50LWRpc3Bvc2l0aW9uPWF0dGFjaG1lbnQlM0IlMjBmaWxlbmFtZSUzRFVsdHJhOGtMYXRpbm8tVjEuMC5hcGsmcmVzcG9uc2UtY29udGVudC10eXBlPWFwcGxpY2F0aW9uJTJGdm5kLmFuZHJvaWQucGFja2FnZS1hcmNoaXZl
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: u8k-hotfix-bridge-temp
+      - name: Recover and verify exact APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p u8k-bridge
+          python - <<'PY'
+          import os,base64,hashlib,urllib.request
+          from pathlib import Path
+          url=base64.b64decode(os.environ['SOURCE_URL_B64']).decode()
+          req=urllib.request.Request(url,headers={'User-Agent':'Ultra8K-Publication-Bridge'})
+          with urllib.request.urlopen(req,timeout=120) as r:
+              data=r.read()
+          assert len(data)==int(os.environ['EXPECTED_SIZE']), (len(data), os.environ['EXPECTED_SIZE'])
+          assert hashlib.sha256(data).hexdigest()==os.environ['EXPECTED_SHA']
+          Path('u8k-bridge/Ultra8kLatino-V1.0.apk').write_bytes(data)
+          print('Exact Ultra8K V1.0 hotfix verified and staged')
+          PY
+      - name: Commit exact APK to temporary bridge branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add u8k-bridge/Ultra8kLatino-V1.0.apk
+          git commit -m 'temp: stage exact Ultra8K V1.0 hotfix bridge'
+          git push origin HEAD:u8k-hotfix-bridge-temp
