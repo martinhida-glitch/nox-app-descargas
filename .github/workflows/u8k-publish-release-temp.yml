@@ -1,0 +1,38 @@
+name: Publish exact Ultra8K V1.0 asset
+
+on:
+  push:
+    branches: [u8k-hotfix-bridge-temp]
+    paths: ['.github/workflows/u8k-publish-release-temp.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_SHA: 104dad193ea982211bd45fe36d8c717eb0edf85c7deecc1f6cd082ac755a0650
+      EXPECTED_SIZE: '20519464'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: u8k-hotfix-bridge-temp
+      - name: Verify exact APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK='u8k-bridge/Ultra8kLatino-V1.0.apk'
+          test -s "$APK"
+          test "$(stat -c %s "$APK")" = "$EXPECTED_SIZE"
+          test "$(sha256sum "$APK" | awk '{print $1}')" = "$EXPECTED_SHA"
+      - name: Publish stable public release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view ultra8k-v1.0 >/dev/null 2>&1; then
+            gh release create ultra8k-v1.0 --target u8k-hotfix-bridge-temp --title 'Ultra8kLatino V1.0' --notes 'APK oficial Ultra8K Latino V1.0. Package com.ultra8k.player, build 270, firma de producción existente, R8/ofuscación verificada.'
+          fi
+          gh release upload ultra8k-v1.0 'u8k-bridge/Ultra8kLatino-V1.0.apk#Ultra8kLatino-V1.0.apk' --clobber
