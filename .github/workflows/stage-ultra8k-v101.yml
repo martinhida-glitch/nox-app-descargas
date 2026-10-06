@@ -19,7 +19,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-679c-820e-b15e-701d1d946d6b/raw?se=2026-10-06T22%3A25%3A43Z&sp=r&sv=2026-02-06&sr=b&scid=dc724c7c-32d4-50fa-9cda-4a2e2129e717&skoid=9fcafdab-1a9a-48a1-833e-6f0dce81fc66&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-06T11%3A31%3A36Z&ske=2026-10-07T11%3A31%3A36Z&sks=b&skv=2026-02-06&sig=TYrDxNyXo9ZfcPH4EEUW7jVqnRVkuOwcX1heZ2ikD8U%3D' -o /tmp/u8k.zip
+          curl -fL --retry 3 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-1750-820e-af8f-18b16c1c7497/raw?se=2026-10-06T22%3A36%3A34Z&sp=r&sv=2026-02-06&sr=b&scid=790fd2ae-7f70-502f-a533-bebd50338ed7&skoid=9fcafdab-1a9a-48a1-833e-6f0dce81fc66&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-06T01%3A08%3A21Z&ske=2026-10-07T01%3A08%3A21Z&sks=b&skv=2026-02-06&sig=F2m13WtR8yQapIYaM0TmQT/vnHbegXHnE25rJmO2QFE%3D' -o /tmp/u8k.zip
           mkdir -p /tmp/u8k
           unzip -q /tmp/u8k.zip -d /tmp/u8k
           test -s /tmp/u8k/Ultra8kLatino-V1.0.1.apk
