@@ -1,0 +1,46 @@
+name: Stage Xuper Fenix 9.0.7 Draft Release (no APK upload)
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/xuper-stage-v907-draft.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-draft-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Prepare protected release draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: martinhida-glitch/nox-app-descargas
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v9.0.7 >/dev/null 2>&1; then
+            echo "Release v9.0.7 already exists. No changes performed."
+            exit 0
+          fi
+          cat >/tmp/release-notes.md <<'NOTES'
+          Xuper Fénix V9.0.7 – VPN automática 7 segundos
+
+          Cambio único previsto: VPN automática 7 segundos desde apertura de Xuper; no reiniciar contador por botón flotante; modo Mantener VPN 90 s intacto.
+
+          Android: package com.nox4k.xuperfenix.v6; versionCode 90015; mismo certificado de producción SHA256 37451f1f4cc89db74ce799d86bb0c9773e3d0f6d679c69e6415fb52f6b51ef0d.
+
+          IMPORTANTE: esta Release es BORRADOR. Todavía no contiene APK.
+          Se debe adjuntar la APK aprobada renombrándola EXACTAMENTE xuper-fenix-v6.apk (sin modificar los bytes), con SHA256 1bd3929a641e3354427b282e9337954e621a48ef63014af57c7c97bc2d41ab7b.
+          Una vez adjuntada, publicar la Release y cambiar, por separado y previa verificación, el Worker nox-descargas y /app-version para 90015.
+          NO CAMBIAR CÓDIGO DOWNLOADER 8272460 NI SUBIR ARCHIVOS DE FIRMA.
+          NOTES
+          gh release create v9.0.7 \
+            --repo "$GH_REPO" \
+            --target main \
+            --draft \
+            --title "Xuper Fénix V9.0.7 · VPN automática 7 segundos" \
+            --notes-file /tmp/release-notes.md
+          echo "Draft created; not published."
