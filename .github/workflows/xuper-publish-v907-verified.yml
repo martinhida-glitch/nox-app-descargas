@@ -1,0 +1,40 @@
+name: Publish verified Xuper Fenix V9.0.7
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/xuper-publish-v907-verified.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify signed APK hash and publish existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: martinhida-glitch/nox-app-descargas
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_ID=409983644
+          EXPECTED='sha256:1bd3929a641e3354427b282e9337954e621a48ef63014af57c7c97bc2d41ab7b'
+          RELEASE="$(gh api "repos/$GH_REPO/releases/$RELEASE_ID")"
+          test "$(jq -r .tag_name <<<"$RELEASE")" = 'v9.0.7'
+          ASSET_INFO="$(gh api "repos/$GH_REPO/releases/$RELEASE_ID/assets")"
+          test "$(jq '[.[] | select(.name == "xuper-fenix-v6.apk")] | length' <<<"$ASSET_INFO")" = 1
+          test "$(jq -r '.[] | select(.name == "xuper-fenix-v6.apk") | .state' <<<"$ASSET_INFO")" = 'uploaded'
+          test "$(jq -r '.[] | select(.name == "xuper-fenix-v6.apk") | .digest' <<<"$ASSET_INFO")" = "$EXPECTED"
+          test "$(jq -r '.[] | select(.name == "xuper-fenix-v6.apk") | .size' <<<"$ASSET_INFO")" = '95884933'
+          if [[ "$(jq -r '.draft' <<<"$RELEASE")" == 'true' ]]; then
+            gh api -X PATCH "repos/$GH_REPO/releases/$RELEASE_ID" -F draft=false -F prerelease=false -f make_latest=false --jq '{id: .id, tag: .tag_name, draft: .draft, published_at: .published_at}'
+          fi
+          POST="$(gh api "repos/$GH_REPO/releases/$RELEASE_ID")"
+          test "$(jq -r .draft <<<"$POST")" = 'false'
+          test "$(jq -r .tag_name <<<"$POST")" = 'v9.0.7'
+          echo "Xuper V9.0.7 release is now public with checked APK. Downloader Worker and app-version not modified here."
