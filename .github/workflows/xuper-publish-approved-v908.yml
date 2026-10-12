@@ -1,0 +1,68 @@
+name: Publish approved Xuper 9.0.8 exact signed APK
+on:
+  push:
+    branches: [release/xuper-v908-90017]
+    paths: ['10_ACTIVE_RELEASE/v908/**', '.github/workflows/xuper-publish-approved-v908.yml']
+permissions:
+  contents: write
+concurrency:
+  group: xuper-approved-v908-publication
+  cancel-in-progress: false
+jobs:
+  publish-exact-approved-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reproduce the exact user-tested signed bytes, without rebuilding or signing
+        run: |
+          python -m pip install bsdiff4==1.2.6
+          python 10_ACTIVE_RELEASE/v908/recover_approved_apk.py
+      - name: Check original production certificate and native alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          tools_dir="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1 | xargs dirname)"
+          "$tools_dir/apksigner" verify --verbose --print-certs release-v908/xuper-fenix-v6.apk > release-v908/signature.txt
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          certs=re.findall(r'certificate SHA-256 digest: ([a-f0-9]+)',Path('release-v908/signature.txt').read_text())
+          assert certs==['37451f1f4cc89db74ce799d86bb0c9773e3d0f6d679c69e6415fb52f6b51ef0d']
+          PY
+          "$tools_dir/zipalign" -c -P 16 4 release-v908/xuper-fenix-v6.apk
+          "$tools_dir/aapt2" dump badging release-v908/xuper-fenix-v6.apk > release-v908/badging.txt
+          python - <<'PY'
+          from pathlib import Path
+          package=Path('release-v908/badging.txt').read_text().splitlines()[0]
+          for expected in ["name='com.nox4k.xuperfenix.v6'","versionCode='90017'","versionName='9.0.8'"]:assert expected in package
+          PY
+      - name: Publish release only after verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: martinhida-glitch/nox-app-descargas
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v9.0.8 >/dev/null 2>&1; then
+            mkdir -p downloaded-v908
+            gh release download v9.0.8 --pattern xuper-fenix-v6.apk --dir downloaded-v908
+            echo '9a2cbf5eef126cc6d47302e28393c0473971d61cb8c92b8f358099b1a1437f24  downloaded-v908/xuper-fenix-v6.apk' | sha256sum -c -
+          else
+            gh release create v9.0.8 release-v908/xuper-fenix-v6.apk release-v908/SHA256.txt release-v908/signature.txt release-v908/badging.txt --draft --target "$GITHUB_SHA" --title 'Xuper Fénix V9.0.8 · build 90017' --notes-file 10_ACTIVE_RELEASE/v908/RELEASE_NOTES.md
+            mkdir -p downloaded-v908
+            gh release download v9.0.8 --pattern xuper-fenix-v6.apk --dir downloaded-v908
+            echo '9a2cbf5eef126cc6d47302e28393c0473971d61cb8c92b8f358099b1a1437f24  downloaded-v908/xuper-fenix-v6.apk' | sha256sum -c -
+          fi
+          gh release edit v9.0.8 --draft=false --prerelease=false --latest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xuper-v908-publication-evidence
+          path: |
+            release-v908/SHA256.txt
+            release-v908/signature.txt
+            release-v908/badging.txt
+      # No keystore, Cloudflare secrets, Worker deployment or D1 migration.
