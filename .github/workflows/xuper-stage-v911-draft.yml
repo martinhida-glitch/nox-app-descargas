@@ -1,0 +1,51 @@
+name: Stage verified Xuper Fénix 9.1.1 draft
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/xuper-stage-v911-draft.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create draft only, never change public download or mandatory update
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: martinhida-glitch/nox-app-descargas
+        run: |
+          set -euo pipefail
+          if gh release view v9.1.1 --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "Release v9.1.1 exists; nothing changed."
+            exit 0
+          fi
+          cat >/tmp/release-notes.md <<'NOTES'
+          Xuper Fénix 9.1.1 — Nueva interfaz, más canales, estabilidad y VPN.
+
+          La nueva versión conserva los días de suscripción y las fechas de vencimiento.
+          El mismo paquete Android y certificado de producción permiten la actualización sobre la instalada.
+
+          Android package: com.nox4k.xuperfenix.v6
+          versionName: 9.1.1
+          versionCode: 91010
+          SHA256 del APK esperado: e3af85b94b11d5a7611ac382899e4fc08ad9c619559fc444a696831974e40622
+          APK size: 81652613 bytes
+          Certificado SHA256: 37451f1f4cc89db74ce799d86bb0c9773e3d0f6d679c69e6415fb52f6b51ef0d
+
+          Release en BORRADOR hasta adjuntar y verificar el APK exacto como xuper-fenix-v6.apk.
+          Mantener ruta pública /fenix y Downloader 8272460.
+          NO activar mandatoryUpdate 91010 ni tocar la base de suscriptores hasta que el APK se distribuya correctamente.
+          NOTES
+          gh release create v9.1.1 \
+            --repo "$GH_REPO" \
+            --target main \
+            --draft \
+            --title "Xuper Fénix V9.1.1 — Interfaz renovada, canales y VPN" \
+            --notes-file /tmp/release-notes.md
+          echo "Staged draft release without affecting current users."
