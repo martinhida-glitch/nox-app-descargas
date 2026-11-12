@@ -1,0 +1,88 @@
+name: Release Fénix Ultra 8K Latino 9.2 (92003) — verified publication
+on:
+  push:
+    branches: [release/fenix-ultra8k-9.2-92003]
+    paths: [.github/workflows/fenix92003-verified-publish.yml]
+permissions:
+  contents: write
+jobs:
+  release-verified:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Retrieve pre-signed owner-approved Fénix APK parts and verify every fragment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/chunks dist
+          curl -fLsS --retry 3 --retry-delay 2 --max-time 300 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-6b78-820e-a415-df63fe8ed327/raw?se=2026-11-12T19%3A49%3A40Z&sp=r&sv=2026-06-06&sr=b&scid=0c450de2-246a-5de7-9b00-c61b61743af8&skoid=9fcafdab-1a9a-48a1-833e-6f0dce81fc66&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-12T12%3A31%3A52Z&ske=2026-11-13T12%3A31%3A52Z&sks=b&skv=2026-06-06&sig=GX0qT/R7taL0h0Xf7IPjL3eWSuSUtJpVr14iU%2BdeEXM%3D' -o /tmp/part00.b64
+          base64 --decode /tmp/part00.b64 > /tmp/part00
+          echo '27ddb687795c6d204b085d8098b77b4f611c009e37c9495bf338ef2bfa90d82e  /tmp/part00' | sha256sum -c -
+          curl -fLsS --retry 3 --retry-delay 2 --max-time 300 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-483c-820e-9241-f475971d9931/raw?se=2026-11-12T19%3A49%3A39Z&sp=r&sv=2026-06-06&sr=b&scid=ba8c17c7-1c44-5552-b146-79f86aabe06c&skoid=9fcafdab-1a9a-48a1-833e-6f0dce81fc66&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-12T09%3A30%3A17Z&ske=2026-11-13T09%3A30%3A17Z&sks=b&skv=2026-06-06&sig=NVuYY9GJX%2BZ9AdMMhtys7NSDz7FDeoxVOnSgQkExWzE%3D' -o /tmp/part01.b64
+          base64 --decode /tmp/part01.b64 > /tmp/part01
+          echo 'd1c6befc6cc1edb7b14d99dd1301ba1f28128f00ab7188fd824abe72e01bb7e3  /tmp/part01' | sha256sum -c -
+          curl -fLsS --retry 3 --retry-delay 2 --max-time 300 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-51f0-820e-bb99-c12a72c5ff2e/raw?se=2026-11-12T19%3A49%3A41Z&sp=r&sv=2026-06-06&sr=b&scid=8db22a8c-9e0a-5aae-ac74-691188d5f3c7&skoid=9fcafdab-1a9a-48a1-833e-6f0dce81fc66&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-12T12%3A17%3A41Z&ske=2026-11-13T12%3A17%3A41Z&sks=b&skv=2026-06-06&sig=MHNFAzyy6w89Z1vxj7xZeIW4kPuqsqfp8QhLR8Uzt8U%3D' -o /tmp/part02.b64
+          base64 --decode /tmp/part02.b64 > /tmp/part02
+          echo '0db6521fa2455d4f7191009705ff2efd8922ae37616fc7ea4feb58f31e9e67f1  /tmp/part02' | sha256sum -c -
+          curl -fLsS --retry 3 --retry-delay 2 --max-time 300 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-80ec-820e-b45c-bf2fa18dfc4e/raw?se=2026-11-12T19%3A49%3A39Z&sp=r&sv=2026-06-06&sr=b&scid=709e3d1d-96fa-5080-88bd-87addbeae438&skoid=9fcafdab-1a9a-48a1-833e-6f0dce81fc66&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-12T11%3A11%3A29Z&ske=2026-11-13T11%3A11%3A29Z&sks=b&skv=2026-06-06&sig=okBBSm1pau0c4MdNSr25aJmLzI%2BVawSckjSGeYdy2Jk%3D' -o /tmp/part03.b64
+          base64 --decode /tmp/part03.b64 > /tmp/part03
+          echo '04c285022cad29e1ddf5406f33ba668ae028db2b640152e6be17f6a9d27d2a7a  /tmp/part03' | sha256sum -c -
+          curl -fLsS --retry 3 --retry-delay 2 --max-time 300 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-36b8-820e-94e6-1af13be01604/raw?se=2026-11-12T19%3A49%3A39Z&sp=r&sv=2026-06-06&sr=b&scid=1f3b2cb8-ac3c-5bb2-ac45-73d044ea3cde&skoid=9fcafdab-1a9a-48a1-833e-6f0dce81fc66&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-12T13%3A19%3A14Z&ske=2026-11-13T13%3A19%3A14Z&sks=b&skv=2026-06-06&sig=UemHpsGjh%2Bah1HTwjtQf36UxlD/oR5WgYoftVsEh/2A%3D' -o /tmp/part04.b64
+          base64 --decode /tmp/part04.b64 > /tmp/part04
+          echo 'cdd85bc074b3b2cbbd9f7fc0b779e6ae0888e511e164753bf934de102fb46c1d  /tmp/part04' | sha256sum -c -
+          curl -fLsS --retry 3 --retry-delay 2 --max-time 300 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-7654-820e-a20b-a6da1320db80/raw?se=2026-11-12T19%3A49%3A43Z&sp=r&sv=2026-06-06&sr=b&scid=6d803b9d-8f56-568d-b882-92b06005cac2&skoid=9fcafdab-1a9a-48a1-833e-6f0dce81fc66&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-12T10%3A41%3A33Z&ske=2026-11-13T10%3A41%3A33Z&sks=b&skv=2026-06-06&sig=41Tze07hlIEtwqAAcwliB%2BruDI2B%2BW8N%2BkDIRQ7Vs3c%3D' -o /tmp/part05.b64
+          base64 --decode /tmp/part05.b64 > /tmp/part05
+          echo '26d6015bc91f129c2d67d0386daa6811283656b0bf7bdf624c9d388d4dbd4a98  /tmp/part05' | sha256sum -c -
+          cat /tmp/part00 /tmp/part01 /tmp/part02 /tmp/part03 /tmp/part04 /tmp/part05 > dist/xuper-fenix-v6.apk
+          echo '3bc5c8282576ee8e19255e81c48781de7e6b7d2829f5288b4730b621c6b4773d  dist/xuper-fenix-v6.apk' | sha256sum -c -
+          test "$(stat -c '%s' dist/xuper-fenix-v6.apk)" -eq 62915530
+          unzip -tq dist/xuper-fenix-v6.apk | tail -n 1
+      - name: Verify production Android identity and original Fénix signer
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=dist/xuper-fenix-v6.apk
+          SIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$SIGNER" && test -x "$AAPT"
+          "$SIGNER" verify --verbose --print-certs "$APK" | tee dist/signature.txt
+          for scheme in v1 v2 v3; do grep -q "Verified using $scheme scheme.*: true" dist/signature.txt; done
+          grep -q 'certificate SHA-256 digest: 37451f1f4cc89db74ce799d86bb0c9773e3d0f6d679c69e6415fb52f6b51ef0d' dist/signature.txt
+          "$AAPT" dump badging "$APK" > dist/badging.txt
+          grep -q "package: name='com.nox4k.xuperfenix.v6' versionCode='92003' versionName='9.2'" dist/badging.txt
+          python3 - <<'PY'
+          import hashlib,zipfile
+          expected='87d9815229873156fc5036f58d49c2a3d6681952bc8b0529a00c6426e4930176'
+          with zipfile.ZipFile('dist/xuper-fenix-v6.apk') as z:
+              v=z.read('assets/ultra8k_latino_tv.apk')
+              assert hashlib.sha256(v).hexdigest()==expected
+              assert z.testzip() is None
+          print('Ultra 1.0.17-310 original bytes verified inside Fénix')
+          PY
+      - name: Stage a draft release, redownload asset, and publish without changing GitHub latest
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view v9.2.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && { echo 'Release v9.2.0 already exists; refuse overwrite'; exit 1; } || true
+          cat > /tmp/fenix-release-notes.txt <<'EOF'
+          Fénix Ultra 8K Latino 9.2 (versionCode 92003).
+          Replaces retired Xuper player with Ultra 8K Latino 1.0.17-310.
+          Preserves active Fénix subscriptions and remaining paid days, TV Argentina, Adultos and other existing Fénix content.
+          Ultra 8K Latino has its own 24-hour trial subject to eligibility; payment is separate at USD 7/month after demo. Nonpayment of Ultra does not block the remaining Fénix service.
+          No payment table, device entitlement, expiry, or billing mutation in this release. Downloader 8272460 remains unchanged.
+          EOF
+          gh release create v9.2.0 dist/xuper-fenix-v6.apk --repo "$GITHUB_REPOSITORY" --target main --draft --latest=false --title 'Fénix Ultra 8K Latino 9.2' --notes-file /tmp/fenix-release-notes.txt
+          mkdir -p /tmp/fenix-release-verify
+          gh release download v9.2.0 --repo "$GITHUB_REPOSITORY" --pattern 'xuper-fenix-v6.apk' --dir /tmp/fenix-release-verify
+          echo '3bc5c8282576ee8e19255e81c48781de7e6b7d2829f5288b4730b621c6b4773d  /tmp/fenix-release-verify/xuper-fenix-v6.apk' | sha256sum -c -
+          gh release edit v9.2.0 --repo "$GITHUB_REPOSITORY" --draft=false --latest=false
+          echo 'PUBLISHED_RELEASE_VERIFIED_v9.2.0'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fenix-9.2-release-verification
+          path: |
+            dist/signature.txt
+            dist/badging.txt
+          retention-days: 7
