@@ -1,0 +1,19 @@
+name: Verify Fenix 92003 artifact transfer path (no publish)
+on:
+  push:
+    branches: [release/fenix-ultra8k-9.2-92003]
+    paths: [.github/workflows/fenix92003-upload-probe.yml]
+permissions:
+  contents: read
+jobs:
+  verify-transfer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download staging probe and verify exact bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 120 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-b440-820e-ab76-ca4b2844b86a/raw?se=2026-11-12T19%3A45%3A23Z&sp=r&sv=2026-06-06&sr=b&scid=7affa727-0d1b-5384-b9cb-9861f83a385c&skoid=9fcafdab-1a9a-48a1-833e-6f0dce81fc66&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-12T10%3A07%3A25Z&ske=2026-11-13T10%3A07%3A25Z&sks=b&skv=2026-06-06&sig=Bv9UVloMTxlPv/Zr8H70lgrqgjVk6V82BWoqOhP3ssg%3D' -o /tmp/fenixprobe.txt
+          printf '%s\n' 'FENIX_TRANSFER_PROBE_92003_2026-11-12' | cmp - /tmp/fenixprobe.txt
+          echo 'FENIX_TRANSFER_OK'
